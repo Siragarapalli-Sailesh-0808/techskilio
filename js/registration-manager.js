@@ -345,6 +345,61 @@ class RegistrationManager {
             return { success: false, error: getConnectionErrorMessage(error) };
         }
     }
+
+    /**
+     * Upload resume file with progress tracking
+     */
+    uploadResumeWithProgress(file, onProgress) {
+        return new Promise((resolve) => {
+            const baseUrl = getApiBaseUrl();
+            if (!baseUrl) {
+                return resolve({ success: false, error: getConnectionErrorMessage() });
+            }
+            if (file && typeof file.size === 'number' && file.size > 2 * 1024 * 1024) {
+                return resolve({
+                    success: false,
+                    error: 'File size limit exceeded. Please compress the file and upload a version smaller than 2 MB.'
+                });
+            }
+
+            const xhr = new XMLHttpRequest();
+            const formData = new FormData();
+            formData.append('file', file);
+
+            xhr.open('POST', `${baseUrl}/api/v1/resumes/upload/`);
+
+            if (onProgress && xhr.upload) {
+                xhr.upload.addEventListener('progress', (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = Math.round((event.loaded / event.total) * 100);
+                        onProgress(percentComplete);
+                    }
+                });
+            }
+
+            xhr.onload = function () {
+                let data = null;
+                try {
+                    data = JSON.parse(xhr.responseText);
+                } catch (err) {
+                    console.error('Non-JSON response from resume upload');
+                }
+
+                if (xhr.status >= 200 && xhr.status < 300 && data && data.resume_key) {
+                    resolve({ success: true, resume_key: data.resume_key, data: data });
+                } else {
+                    const serverMsg = getUploadErrorMessage({ status: xhr.status }, data);
+                    resolve({ success: false, error: serverMsg || 'Resume upload failed', status: xhr.status });
+                }
+            };
+
+            xhr.onerror = function () {
+                resolve({ success: false, error: 'Network error occurred during resume upload.' });
+            };
+
+            xhr.send(formData);
+        });
+    }
 }
 
 // Create global instance

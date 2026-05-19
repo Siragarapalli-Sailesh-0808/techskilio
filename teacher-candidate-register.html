@@ -678,8 +678,8 @@
                             <div class="form-group">
                                 <label>Resume Upload <span class="required">*</span></label>
                                 <input type="file" name="resume" accept=".pdf,.doc,.docx" required id="resumeUpload">
-                                <small style="color: #64748b;">PDF/Word, Max 5 MB</small>
-                                <div class="error-message">Please upload a resume (max 5 MB)</div>
+                                <small style="color: #64748b;">PDF/Word, Max 2 MB</small>
+                                <div class="error-message">Please upload a resume (max 2 MB)</div>
                             </div>
                         </div>
                         <div class="form-group">
@@ -923,9 +923,9 @@
             }
         });
 
+        let selectedResumeFile = null;
         let uploadedResumeKey = null;
         let uploadedResumeOriginalFilename = null;
-        let isUploadingResume = false;
 
         // Create status element near the upload input
         const resumeUploadInput = document.getElementById('resumeUpload');
@@ -936,46 +936,28 @@
             resumeUploadInput.parentNode.appendChild(resumeStatusDiv);
         }
 
-        resumeUploadInput.addEventListener('change', async function () {
+        resumeUploadInput.addEventListener('change', function () {
             const file = this.files[0];
             
-            // Clear previous upload state
+            // Clear previous state
+            selectedResumeFile = null;
             uploadedResumeKey = null;
             uploadedResumeOriginalFilename = null;
             resumeStatusDiv.innerHTML = '';
             
             if (!file) return;
 
-            // Perform size validation (5 MB)
-            const maxBytes = 5 * 1024 * 1024;
-            if (file.size > maxBytes) {
-                alert('Resume exceeds 5 MB. Please compress the file and upload a version smaller than 5 MB.');
+            // Perform size validation (2 MB)
+            if (file.size > FILE_SIZE_LIMIT_BYTES) {
+                showFieldError(this, 'Resume exceeds 2 MB. Please compress the file and upload a version smaller than 2 MB.');
                 this.value = '';
-                resumeStatusDiv.innerHTML = '<span style="color: #ef4444;"><i class="fas fa-times-circle"></i> File is too large (max 5 MB)</span>';
+                resumeStatusDiv.innerHTML = '<span style="color: #ef4444;"><i class="fas fa-times-circle"></i> File is too large (max 2 MB)</span>';
                 return;
             }
 
-            // Show loading in background
-            isUploadingResume = true;
-            resumeStatusDiv.innerHTML = '<span style="color: #3b82f6;"><i class="fas fa-spinner fa-spin"></i> Uploading resume in background...</span>';
-
-            const uploadRes = await registrationManager.uploadResume(file);
-            isUploadingResume = false;
-
-            if (uploadRes.success) {
-                uploadedResumeKey = uploadRes.resume_key;
-                uploadedResumeOriginalFilename = uploadRes.data?.original_filename || file.name;
-                resumeStatusDiv.innerHTML = '<span style="color: #10b981;"><i class="fas fa-check-circle"></i> Resume uploaded successfully!</span>';
-            } else {
-                this.value = '';
-                const span = document.createElement('span');
-                span.style.color = '#ef4444';
-                span.innerHTML = '<i class="fas fa-times-circle"></i> ';
-                const textNode = document.createTextNode(uploadRes.error || 'Upload failed');
-                span.appendChild(textNode);
-                resumeStatusDiv.appendChild(span);
-                alert('Resume upload failed: ' + uploadRes.error);
-            }
+            selectedResumeFile = file;
+            resumeStatusDiv.innerHTML = '<span style="color: #3b82f6;"><i class="fas fa-file-alt"></i> Resume selected: ' + file.name + ' (will be uploaded on form submission)</span>';
+            clearFieldError(this);
         });
 
         // Form validation and submission
@@ -1051,15 +1033,8 @@
                     return;
                 }
 
-                if (isUploadingResume) {
-                    alert('Please wait, your resume is still uploading in the background.');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalBtnText;
-                    return;
-                }
-
-                if (!uploadedResumeKey) {
-                    alert('Please upload your resume.');
+                if (!selectedResumeFile && !uploadedResumeKey) {
+                    showFieldError(resumeUpload, 'Please upload your resume.');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalBtnText;
                     return;
@@ -1172,7 +1147,34 @@
                 const currentSalaryLPA = salaryValidation.currentSalaryLPA;
                 const expectedSalaryLPA = salaryValidation.expectedSalaryLPA;
 
-                submitBtn.innerHTML = 'Registering...';
+                // Show progress overlay and upload resume with progress bar
+                showProgressOverlay();
+                updateProgressOverlay(0, 'Preparing resume upload...', 'Uploading Resume', 'fas fa-file-upload fa-bounce');
+
+                if (selectedResumeFile && !uploadedResumeKey) {
+                    try {
+                        const uploadRes = await registrationManager.uploadResumeWithProgress(selectedResumeFile, (percent) => {
+                            updateProgressOverlay(percent, `Uploading resume... ${percent}%`, 'Uploading Resume');
+                        });
+
+                        if (uploadRes.success) {
+                            uploadedResumeKey = uploadRes.resume_key;
+                            uploadedResumeOriginalFilename = uploadRes.data?.original_filename || selectedResumeFile.name;
+                            updateProgressOverlay(100, 'Resume uploaded successfully!', 'Uploading Resume');
+                        } else {
+                            throw new Error(uploadRes.error || 'Upload failed');
+                        }
+                    } catch (uploadErr) {
+                        console.error('Resume upload error:', uploadErr);
+                        hideProgressOverlay();
+                        alert('Resume upload failed: ' + (uploadErr.message || uploadErr) + '. Please check your internet connection and try again.');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnText;
+                        return;
+                    }
+                }
+
+                updateProgressOverlay(null, 'Registering candidate... Please wait.', 'Submitting Registration', 'fas fa-spinner fa-spin');
 
                 // Transform data to match exact API schema
                 const youtubeLinkValue = (form.elements['youtubeLink']?.value || '').trim();
@@ -1253,11 +1255,118 @@
                 console.error('Registration Error:', error);
                 alert(error.message || 'An error occurred during registration. Please try again.');
             } finally {
+                hideProgressOverlay();
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnText;
             }
         });
+
+        function showProgressOverlay() {
+            const overlay = document.getElementById('progressOverlay');
+            overlay.style.display = 'flex';
+            overlay.offsetHeight;
+            overlay.style.opacity = '1';
+        }
+
+        function updateProgressOverlay(percent, statusText, titleText, iconClass) {
+            const progressBar = document.getElementById('progressBar');
+            const progressPercentage = document.getElementById('progressPercentage');
+            const progressStatus = document.getElementById('progressStatus');
+            
+            if (percent !== null) {
+                progressBar.style.width = percent + '%';
+                progressPercentage.textContent = percent + '%';
+            } else {
+                progressBar.style.width = '100%';
+                progressPercentage.textContent = '';
+            }
+            
+            if (statusText) progressStatus.textContent = statusText;
+            if (titleText) document.getElementById('progressTitle').textContent = titleText;
+            if (iconClass) {
+                const iconContainer = document.getElementById('progressIcon');
+                iconContainer.innerHTML = `<i class="${iconClass}"></i>`;
+            }
+        }
+
+        function hideProgressOverlay() {
+            const overlay = document.getElementById('progressOverlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 300);
+        }
     </script>
+
+    <!-- Upload/Registration Progress Overlay -->
+    <div id="progressOverlay" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(8px);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    ">
+        <div style="
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 450px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            text-align: center;
+        ">
+            <div id="progressIcon" style="font-size: 3rem; color: #86c540; margin-bottom: 1.5rem;">
+                <i class="fas fa-file-upload fa-bounce"></i>
+            </div>
+            <h3 id="progressTitle" style="
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #1e293b;
+                margin-bottom: 0.5rem;
+                font-family: 'Space Grotesk', sans-serif;
+            ">Uploading Resume</h3>
+            <p id="progressStatus" style="
+                font-size: 0.95rem;
+                color: #64748b;
+                margin-bottom: 1.5rem;
+                font-family: 'Poppins', sans-serif;
+            ">Preparing upload...</p>
+            
+            <!-- Progress Bar Container -->
+            <div style="
+                width: 100%;
+                background-color: #f1f5f9;
+                border-radius: 9999px;
+                height: 10px;
+                overflow: hidden;
+                margin-bottom: 1rem;
+            ">
+                <div id="progressBar" style="
+                    width: 0%;
+                    height: 100%;
+                    background: linear-gradient(90deg, #86c540, #5da02a);
+                    border-radius: 9999px;
+                    transition: width 0.1s ease;
+                "></div>
+            </div>
+            
+            <div id="progressPercentage" style="
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: #86c540;
+                font-family: 'Space Grotesk', sans-serif;
+            ">0%</div>
+        </div>
+    </div>
+
     <script src="js/api-config.js"></script>
     <script src="load-header.js"></script>
 </body>
