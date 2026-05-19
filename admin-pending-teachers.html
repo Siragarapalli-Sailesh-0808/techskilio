@@ -650,7 +650,7 @@
                 <div class="detail-row"><strong>Status</strong><span>${getStatusBadge(p.status)}</span></div>
                 <div class="detail-row"><strong>Registered</strong><span>${formatDate(p.created_at)}</span></div>
                 ${p.youtube_link ? `<div class="detail-row"><strong>YouTube</strong><span><a href="${p.youtube_link}" target="_blank" style="color:#86c540;">${p.youtube_link}</a></span></div>` : ''}
-                ${p.resume_url ? `<div class="detail-row"><strong>Resume</strong><span><a href="${p.resume_url}" target="_blank" style="color:#86c540;">Download Resume</a></span></div>` : ''}
+                ${(p.resume_key || p.resume_url) ? `<div class="detail-row"><strong>Resume</strong><span><a href="#" onclick="event.preventDefault(); window.viewCandidateResume('${t.user_id}', this); return false;" style="color:#86c540;">Download Resume</a></span></div>` : ''}
                 
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top: 20px; border-top: 2px solid #f1f5f9; padding-top: 15px;">
                     <button class="action-btn" style="background:#10b981;border-color:#10b981;color:#fff;padding:0.6rem 1.2rem;font-size:1rem;" onclick="approveTeacher(${t.user_id}); closeDetailModal();">Approve Candidate</button>

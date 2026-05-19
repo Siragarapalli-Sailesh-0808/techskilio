@@ -402,10 +402,53 @@ class AuthManager {
         this.clearAuth();
         window.location.href = 'login.html';
     }
+
+    /**
+     * Fetch pre-signed download URL for a candidate's resume
+     */
+    async downloadCandidateResume(userId) {
+        try {
+            const response = await this.apiRequest(`/api/v1/resumes/${userId}/download/`, {
+                method: 'GET'
+            });
+            const data = await response.json();
+            if (response.ok && data.url) {
+                return { success: true, url: data.url };
+            } else {
+                return { success: false, error: data.detail || data.message || 'Failed to fetch resume link' };
+            }
+        } catch (err) {
+            console.error('Error fetching resume link:', err);
+            return { success: false, error: 'Network error fetching resume link' };
+        }
+    }
 }
 
 // Create global instance
 const authManager = new AuthManager();
+
+// Global helper function for viewing resumes across dashboards
+window.viewCandidateResume = async function (userId, element) {
+    if (!userId) {
+        alert('Invalid Candidate ID');
+        return;
+    }
+    const originalText = element ? element.innerText : 'View Resume';
+    if (element) {
+        element.style.pointerEvents = 'none';
+        element.innerText = 'Loading...';
+    }
+    const result = await authManager.downloadCandidateResume(userId);
+    if (element) {
+        element.style.pointerEvents = 'auto';
+        element.innerText = originalText;
+    }
+    if (result.success && result.url) {
+        window.open(result.url, '_blank');
+    } else {
+        alert('Could not retrieve resume: ' + result.error);
+    }
+};
 
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {

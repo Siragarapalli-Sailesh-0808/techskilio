@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Postings - TechSkillio Admin</title>
+    <title>Job Postings - TechSkillio Admin (V2)</title>
     <link rel="icon" href="favicon.jpg" type="image/png">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
@@ -548,7 +548,8 @@
 
                     <div class="form-group">
                         <label id="formCompanyInstitutionLabel">Company / Institution *</label>
-                        <input type="text" name="company_institution" id="formCompanyInstitution" placeholder="e.g. Company name or School name" required>
+                        <input type="text" name="company_name" id="formCompanyInstitution" placeholder="e.g. Company name or School name" required oninput="document.getElementById('hiddenInstitutionName').value = this.value">
+                        <input type="hidden" name="institution_name" id="hiddenInstitutionName">
                     </div>
 
                     <div class="form-group">
@@ -601,6 +602,11 @@
                             <label>Expected Gross Salary (₹) *</label>
                             <input type="number" name="salary_max" min="0" placeholder="e.g. 1200000" required>
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Qualification Required *</label>
+                        <input type="text" name="qualification" placeholder="e.g. B.Ed, M.Sc, Ph.D" required>
                     </div>
 
                     <div class="form-group" id="formSkillsGroup">
@@ -955,12 +961,15 @@
             const formData = new FormData(form);
             const category = formData.get('job_category');
 
-            const companyInstitution = (formData.get('company_institution') || '').toString().trim();
+            const companyName = (formData.get('company_name') || '').toString().trim();
+            const institutionName = (formData.get('institution_name') || companyName).toString().trim();
             const payload = {
                 job_category: category,
                 is_teaching_job: category === 'teacher' ? formData.get('is_teaching_job') === 'true' : false,
                 title: formData.get('title'),
-                ...(category === 'it' ? { company_name: companyInstitution } : { institution_name: companyInstitution }),
+                // Backend requires company_name for all admin-created jobs
+                company_name: companyName,
+                institution_name: institutionName,
                 description: formData.get('description'),
                 location: formData.get('location'),
                 employment_type: formData.get('employment_type'),
@@ -969,6 +978,7 @@
                 experience_max_years: Number(formData.get('experience_max_years')),
                 salary_min: Number(formData.get('salary_min')),
                 salary_max: Number(formData.get('salary_max')),
+                qualification: (formData.get('qualification') || '').toString().trim(),
                 skills_required: category === 'it' && formData.get('skills_required')
                     ? formData.get('skills_required').split(',').map(s => s.trim()).filter(Boolean)
                     : null,

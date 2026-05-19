@@ -990,14 +990,19 @@
                 function renderDetailFromData(data, body) {
                     var user = data.user || data;
                     var profile = data.profile || user.profile || {};
-                    var resumeUrl = user.resume_url || profile.resume_url || data.resume_url;
+                    var resumeUrl = user.resume_key || user.resume_url || profile.resume_key || profile.resume_url || data.resume_key || data.resume_url;
 
                     if (!resumeUrl) {
                         body.innerHTML = '<div style="text-align:center; padding: 40px;"><i class="fas fa-file-excel fa-3x" style="color: #ef4444; margin-bottom: 16px;"></i><h3 style="color: #333; margin: 0 0 8px 0;">No Resume Found</h3><p style="color: #64748b;">This candidate has not uploaded a resume yet.</p></div>';
                         return;
                     }
 
-                    body.innerHTML = '<div style="text-align:center; padding: 40px;"><a href="' + escapeHtml(resumeUrl) + '" target="_blank" rel="noopener" class="btn-view-details" style="display: inline-flex; font-size: 16px; padding: 12px 24px; text-decoration: none;"><i class="fas fa-external-link-alt"></i> Open Resume</a></div>';
+                    var userType = localStorage.getItem('userType') || sessionStorage.getItem('userType') || '';
+                    if (userType === 'teacher_employer' || userType === 'teacher_employer_nonteaching') {
+                        body.innerHTML = '<div style="text-align:center; padding: 40px;"><a href="#" onclick="event.preventDefault(); window.viewCandidateResume(\'' + user.id + '\', this); return false;" class="btn-view-details" style="display: inline-flex; font-size: 16px; padding: 12px 24px; text-decoration: none;"><i class="fas fa-external-link-alt"></i> Open Resume</a></div>';
+                    } else {
+                        body.innerHTML = '<div style="text-align:center; padding: 40px;"><a href="' + escapeHtml(resumeUrl) + '" target="_blank" rel="noopener" class="btn-view-details" style="display: inline-flex; font-size: 16px; padding: 12px 24px; text-decoration: none;"><i class="fas fa-external-link-alt"></i> Open Resume</a></div>';
+                    }
                 }
 
                 function hasEnoughToShowDetail(c) {

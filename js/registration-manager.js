@@ -21,19 +21,54 @@ function getConnectionErrorMessage(err) {
 }
 
 function getUploadErrorMessage(response, data) {
-    if (response && (response.status === 413 || response.status === 422)) {
-        return 'File size limit exceeded. Please compress the file and upload a version smaller than 2 MB.';
-    }
-
-    const serverMsg = (data && (data.message || data.detail || data.error)) || '';
-    if (typeof serverMsg === 'string') {
-        const lower = serverMsg.toLowerCase();
-        if (lower.includes('too large') || lower.includes('file size') || lower.includes('size limit') || lower.includes('payload')) {
-            return 'File size limit exceeded. Please compress the file and upload a version smaller than 2 MB.';
+    if (response) {
+        if (response.status === 429) {
+            return 'Too many upload attempts. Please try again in an hour.';
+        }
+        if (response.status === 500) {
+            if (data && data.detail === 'Storage error') {
+                return 'Storage service error (R2 storage is currently unreachable). Please contact support.';
+            }
+            return 'Internal Server Error (500) on the API server. Please check backend server logs (e.g., Cloudflare R2 storage credentials/configuration).';
+        }
+        if (response.status === 404) {
+            return 'Upload endpoint not found (404). Please verify API base URL and endpoints.';
+        }
+        if (response.status === 413 || response.status === 422) {
+            return 'File size limit exceeded. Please compress the file and upload a version smaller than 5 MB.';
         }
     }
 
-    return serverMsg || 'File upload failed. Please verify file type and size, then try again.';
+    if (data) {
+        const serverMsg = data.message || data.detail || data.error;
+        if (serverMsg && typeof serverMsg === 'string') {
+            const lower = serverMsg.toLowerCase();
+            if (lower.includes('too large') || lower.includes('file size') || lower.includes('size limit') || lower.includes('payload')) {
+                return 'File size limit exceeded. Please compress the file and upload a version smaller than 5 MB.';
+            }
+            return serverMsg;
+        }
+        
+        if (typeof data === 'object') {
+            const errors = [];
+            for (const key in data) {
+                if (Array.isArray(data[key])) {
+                    errors.push(toDisplayFieldName(key) + ': ' + data[key].join(', '));
+                } else if (typeof data[key] === 'string') {
+                    errors.push(toDisplayFieldName(key) + ': ' + data[key]);
+                }
+            }
+            if (errors.length > 0) {
+                return errors.join('; ');
+            }
+        }
+    }
+
+    if (response && response.status) {
+        return 'Server returned error ' + response.status + '. Please check the backend server configuration.';
+    }
+
+    return 'File upload failed. Please verify file type and size, then try again.';
 }
 
 function toDisplayFieldName(key) {
@@ -265,6 +300,48 @@ class RegistrationManager {
             }
         } catch (error) {
             console.error('File upload error:', error);
+            return { success: false, error: getConnectionErrorMessage(error) };
+        }
+    }
+
+    /**
+     * Upload resume file to dedicated resumes endpoint
+     */
+    async uploadResume(file) {
+        const baseUrl = getApiBaseUrl();
+        if (!baseUrl) return { success: false, error: getConnectionErrorMessage() };
+
+        if (file && typeof file.size === 'number' && file.size > 5 * 1024 * 1024) {
+            return {
+                success: false,
+                error: 'File size limit exceeded. Please compress the file and upload a version smaller than 5 MB.'
+            };
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch(`${baseUrl}/api/v1/resumes/upload/`, {
+                method: 'POST',
+                body: formData
+            });
+
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (err) {
+                console.error('Non-JSON response from resume upload');
+            }
+
+            if (response.ok && data && data.resume_key) {
+                return { success: true, resume_key: data.resume_key, data: data };
+            } else {
+                const serverMsg = getUploadErrorMessage(response, data);
+                return { success: false, error: serverMsg || 'Resume upload failed', status: response.status };
+            }
+        } catch (error) {
+            console.error('Resume upload error:', error);
             return { success: false, error: getConnectionErrorMessage(error) };
         }
     }

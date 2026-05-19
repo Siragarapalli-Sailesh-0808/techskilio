@@ -518,8 +518,12 @@
                     var s = toStr(value);
                     rows.push('<div class="detail-row"><span class="detail-label">' + escapeHtml(String(label).replace(/_/g, ' ')) + '</span><span>' + escapeHtml(s != null ? s : '—') + '</span></div>');
                 }
-                function addRowLink(label, url, text) {
-                    rows.push('<div class="detail-row"><span class="detail-label">' + escapeHtml(String(label).replace(/_/g, ' ')) + '</span><span>' + (url ? '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(text || 'View') + '</a>' : '—') + '</span></div>');
+                function addRowLink(label, url, text, userId) {
+                    if (label === 'Resume' && userId) {
+                        rows.push('<div class="detail-row"><span class="detail-label">' + escapeHtml(String(label).replace(/_/g, ' ')) + '</span><span>' + (url ? '<a href="#" onclick="event.preventDefault(); window.viewCandidateResume(\'' + userId + '\', this); return false;">' + escapeHtml(text || 'View') + '</a>' : '—') + '</span></div>');
+                    } else {
+                        rows.push('<div class="detail-row"><span class="detail-label">' + escapeHtml(String(label).replace(/_/g, ' ')) + '</span><span>' + (url ? '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(text || 'View') + '</a>' : '—') + '</span></div>');
+                    }
                 }
                 var user = data.user || data;
                 var profile = data.profile || user.profile || {};
@@ -529,7 +533,7 @@
                 addRowAlways('User ID', user.id);
                 addRowAlways('Phone', user.phone || profile.phone || profile.mobile);
                 addRowAlways('User type', user.user_type || data.user_type || profile.user_type);
-                addRowLink('Resume', user.resume_url || profile.resume_url || data.resume_url, 'View resume');
+                addRowLink('Resume', user.resume_key || user.resume_url || profile.resume_key || profile.resume_url || data.resume_key || data.resume_url, 'View resume', user.id);
                 addRowAlways('Key skills', flat('skills') || flat('key_skills'));
                 addRowAlways('Desired role', flat('current_designation') || flat('desired_role') || flat('current_role'));
                 addRowAlways('Notice period', flat('notice_period'));
@@ -558,11 +562,15 @@
             }
 
             function renderModalFromListData(c) {
+                var cUserId = getCandidateUserId(c);
                 var rowAlways = function (label, value) {
                     var s = (value != null && value !== '') ? String(value) : '—';
                     return '<div class="detail-row"><span class="detail-label">' + escapeHtml(label) + '</span><span>' + escapeHtml(s) + '</span></div>';
                 };
                 var rowLink = function (label, url, text) {
+                    if (label === 'Resume' && cUserId) {
+                        return '<div class="detail-row"><span class="detail-label">' + escapeHtml(label) + '</span><span>' + (url ? '<a href="#" onclick="event.preventDefault(); window.viewCandidateResume(\'' + cUserId + '\', this); return false;">' + escapeHtml(text || 'View') + '</a>' : '—') + '</span></div>';
+                    }
                     return '<div class="detail-row"><span class="detail-label">' + escapeHtml(label) + '</span><span>' + (url ? '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(text || 'View') + '</a>' : '—') + '</span></div>';
                 };
                 var profile = c.profile || c.candidate_profile || c;
@@ -573,7 +581,7 @@
                 parts.push(rowAlways('Phone', getVal(c, ['phone', 'mobile', 'contact_number', 'phone_number']) || getVal(profile, ['phone', 'mobile', 'contact_number'])));
                 parts.push(rowAlways('Applied date', appliedDate ? new Date(appliedDate).toLocaleDateString() : null));
                 parts.push(rowAlways('Status', getVal(c, ['status', 'application_status'])));
-                parts.push(rowLink('Resume', c.resume_url || c.resume || profile.resume_url, 'View resume'));
+                parts.push(rowLink('Resume', c.resume_key || c.resume_url || c.resume || profile.resume_key || profile.resume_url, 'View resume'));
                 parts.push(rowAlways('Experience', c.experience != null ? c.experience + ' yrs' : getVal(profile, ['experience', 'total_experience'])));
                 parts.push(rowAlways('Education', getVal(c, ['education', 'qualification']) || getVal(profile, ['education', 'highest_qualification', 'qualification'])));
                 parts.push(rowAlways('Key skills', getVal(c, ['key_skills', 'skills']) || getVal(profile, ['key_skills', 'skills'])));

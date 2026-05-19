@@ -678,8 +678,8 @@
                             <div class="form-group">
                                 <label>Resume Upload <span class="required">*</span></label>
                                 <input type="file" name="resume" accept=".pdf,.doc,.docx" required id="resumeUpload">
-                                <small style="color: #64748b;">PDF/Word, Max 2 MB</small>
-                                <div class="error-message">Please upload a resume (max 2 MB)</div>
+                                <small style="color: #64748b;">PDF/Word, Max 5 MB</small>
+                                <div class="error-message">Please upload a resume (max 5 MB)</div>
                             </div>
                         </div>
                         <div class="form-group">
@@ -923,6 +923,61 @@
             }
         });
 
+        let uploadedResumeKey = null;
+        let uploadedResumeOriginalFilename = null;
+        let isUploadingResume = false;
+
+        // Create status element near the upload input
+        const resumeUploadInput = document.getElementById('resumeUpload');
+        const resumeStatusDiv = document.createElement('div');
+        resumeStatusDiv.id = 'resumeUploadStatus';
+        resumeStatusDiv.style.cssText = 'font-size: 0.85rem; margin-top: 5px; font-weight: 500;';
+        if (resumeUploadInput) {
+            resumeUploadInput.parentNode.appendChild(resumeStatusDiv);
+        }
+
+        resumeUploadInput.addEventListener('change', async function () {
+            const file = this.files[0];
+            
+            // Clear previous upload state
+            uploadedResumeKey = null;
+            uploadedResumeOriginalFilename = null;
+            resumeStatusDiv.innerHTML = '';
+            
+            if (!file) return;
+
+            // Perform size validation (5 MB)
+            const maxBytes = 5 * 1024 * 1024;
+            if (file.size > maxBytes) {
+                alert('Resume exceeds 5 MB. Please compress the file and upload a version smaller than 5 MB.');
+                this.value = '';
+                resumeStatusDiv.innerHTML = '<span style="color: #ef4444;"><i class="fas fa-times-circle"></i> File is too large (max 5 MB)</span>';
+                return;
+            }
+
+            // Show loading in background
+            isUploadingResume = true;
+            resumeStatusDiv.innerHTML = '<span style="color: #3b82f6;"><i class="fas fa-spinner fa-spin"></i> Uploading resume in background...</span>';
+
+            const uploadRes = await registrationManager.uploadResume(file);
+            isUploadingResume = false;
+
+            if (uploadRes.success) {
+                uploadedResumeKey = uploadRes.resume_key;
+                uploadedResumeOriginalFilename = uploadRes.data?.original_filename || file.name;
+                resumeStatusDiv.innerHTML = '<span style="color: #10b981;"><i class="fas fa-check-circle"></i> Resume uploaded successfully!</span>';
+            } else {
+                this.value = '';
+                const span = document.createElement('span');
+                span.style.color = '#ef4444';
+                span.innerHTML = '<i class="fas fa-times-circle"></i> ';
+                const textNode = document.createTextNode(uploadRes.error || 'Upload failed');
+                span.appendChild(textNode);
+                resumeStatusDiv.appendChild(span);
+                alert('Resume upload failed: ' + uploadRes.error);
+            }
+        });
+
         // Form validation and submission
         document.getElementById('teacherRegistrationForm').addEventListener('submit', async function (e) {
             e.preventDefault();
@@ -996,7 +1051,15 @@
                     return;
                 }
 
-                if (!validateFileSize(resumeUpload, 'Resume')) {
+                if (isUploadingResume) {
+                    alert('Please wait, your resume is still uploading in the background.');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+
+                if (!uploadedResumeKey) {
+                    alert('Please upload your resume.');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalBtnText;
                     return;
@@ -1109,6 +1172,8 @@
                 const currentSalaryLPA = salaryValidation.currentSalaryLPA;
                 const expectedSalaryLPA = salaryValidation.expectedSalaryLPA;
 
+                submitBtn.innerHTML = 'Registering...';
+
                 // Transform data to match exact API schema
                 const youtubeLinkValue = (form.elements['youtubeLink']?.value || '').trim();
 
@@ -1159,7 +1224,8 @@
                     expected_salary: expectedSalaryLPA * 100000,
 
                     photo_url: "https://example.com/uploads/photo.jpg", // Placeholder
-                    resume_url: "https://example.com/uploads/resume.pdf", // Placeholder
+                    resume_key: uploadedResumeKey,
+                    resume_original_filename: uploadedResumeOriginalFilename,
                     certificates_urls: ["https://example.com/uploads/certificate1.pdf"], // Placeholder
 
                     position_type: null,

@@ -542,16 +542,18 @@ console.log("TechSkillio website loaded successfully! 🎉");
   document.addEventListener('click', e => {
     if (e.target.closest('.open-apply')) {
       e.preventDefault();
-      modal.style.display = 'block';
+      if (modal) modal.style.display = 'block';
     }
   });
 
   // close when X is clicked
-  closeBtn.addEventListener('click', () => modal.style.display = 'none');
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => modal.style.display = 'none');
+  }
 
   // close when user clicks outside the form
   window.addEventListener('click', e => {
-    if (e.target === modal) modal.style.display = 'none';
+    if (modal && e.target === modal) modal.style.display = 'none';
   });
 })();
 

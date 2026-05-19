@@ -517,9 +517,13 @@
                             if (typeof value === 'object') return;
                             rows.push('<div class="detail-row"><strong>' + escapeHtml(String(label).replace(/_/g, ' ')) + '</strong><span>' + escapeHtml(String(value)) + '</span></div>');
                         }
-                        function addRowLink(label, url, text) {
+                        function addRowLink(label, url, text, userId) {
                             if (!url) return;
-                            rows.push('<div class="detail-row"><strong>' + escapeHtml(String(label).replace(/_/g, ' ')) + '</strong><span><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(text || 'View') + '</a></span></div>');
+                            if (label === 'Resume' && userId) {
+                                rows.push('<div class="detail-row"><strong>' + escapeHtml(String(label).replace(/_/g, ' ')) + '</strong><span><a href="#" onclick="event.preventDefault(); window.viewCandidateResume(\'' + userId + '\', this); return false;">' + escapeHtml(text || 'View') + '</a></span></div>');
+                            } else {
+                                rows.push('<div class="detail-row"><strong>' + escapeHtml(String(label).replace(/_/g, ' ')) + '</strong><span><a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(text || 'View') + '</a></span></div>');
+                            }
                         }
                         var user = data.user || data;
                         var profile = data.profile || user.profile || {};
@@ -528,14 +532,14 @@
                         addRow('User ID', user.id);
                         addRow('Phone', user.phone || profile.phone || profile.mobile);
                         addRow('User type', user.user_type || data.user_type || profile.user_type);
-                        addRowLink('Resume', user.resume_url || profile.resume_url || data.resume_url, 'View resume');
+                        addRowLink('Resume', user.resume_key || user.resume_url || profile.resume_key || profile.resume_url || data.resume_key || data.resume_url, 'View resume', user.id);
                         ['experience', 'current_company', 'current_designation', 'expected_salary', 'notice_period', 'education', 'degree', 'college', 'location', 'city', 'state', 'country', 'date_of_birth', 'gender', 'summary', 'bio', 'skills', 'subjects', 'certifications', 'languages'].forEach(function (k) {
                             var v = user[k] || profile[k] || data[k];
                             if (v != null && v !== '') addRow(k, v);
                         });
                         if (profile && typeof profile === 'object') {
                             Object.keys(profile).forEach(function (k) {
-                                if (['name', 'full_name', 'email', 'phone', 'mobile', 'user_type', 'resume_url'].indexOf(k) !== -1) return;
+                                if (['name', 'full_name', 'email', 'phone', 'mobile', 'user_type', 'resume_url', 'resume_key'].indexOf(k) !== -1) return;
                                 var v = profile[k];
                                 if (v != null && v !== '') addRow(k, v);
                             });
