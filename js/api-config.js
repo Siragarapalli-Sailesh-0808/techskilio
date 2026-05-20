@@ -1,4 +1,6 @@
-window.API_BASE_URL = 'https://techskillio.heybyte.in';
+window.API_BASE_URL = ['localhost', '127.0.0.1'].includes(window.location.hostname) || window.location.hostname.startsWith('192.168.')
+	? 'https://techskillio.heybyte.in'
+	: '';
 // window.API_BASE_URL = 'http://192.168.1.3:8001';
 
 /** GET list (employers + admin table). */
