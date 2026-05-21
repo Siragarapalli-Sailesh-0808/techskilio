@@ -366,7 +366,9 @@ class RegistrationManager {
             const formData = new FormData();
             formData.append('file', file);
 
-            xhr.open('POST', `${baseUrl}/api/v1/resumes/upload/`);
+            const uploadUrl = `${baseUrl}/api/v1/resumes/upload/`;
+            console.log('registration-manager: uploadResumeWithProgress -> uploading to', uploadUrl, { fileName: file && file.name, fileSize: file && file.size });
+            xhr.open('POST', uploadUrl);
 
             if (onProgress && xhr.upload) {
                 xhr.upload.addEventListener('progress', (event) => {
@@ -382,7 +384,7 @@ class RegistrationManager {
                 try {
                     data = JSON.parse(xhr.responseText);
                 } catch (err) {
-                    console.error('Non-JSON response from resume upload');
+                    console.error('Non-JSON response from resume upload', { status: xhr.status, responseText: xhr.responseText });
                 }
 
                 if (xhr.status >= 200 && xhr.status < 300 && data && data.resume_key) {
@@ -393,8 +395,9 @@ class RegistrationManager {
                 }
             };
 
-            xhr.onerror = function () {
-                resolve({ success: false, error: 'Network error occurred during resume upload.' });
+            xhr.onerror = function (ev) {
+                console.error('XHR upload error', ev, { status: xhr.status, responseText: xhr.responseText });
+                resolve({ success: false, error: 'Network error occurred during resume upload. See console for details.' });
             };
 
             xhr.send(formData);
